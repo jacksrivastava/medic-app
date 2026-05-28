@@ -12,41 +12,56 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = BentoBlueAccentDark,
-    secondary = BentoSalmonBgDark,
-    tertiary = BentoGreenBgDark,
-    background = BentoBgDark,
-    surface = BentoBackboneDark,
-    onPrimary = BentoTextLight,
-    onSecondary = BentoDeepRedTextDark,
-    onTertiary = BentoDeepGreenTextDark,
-    primaryContainer = BentoLightBlueBgDark,
-    onPrimaryContainer = BentoDeepBlueTextDark,
-    secondaryContainer = BentoSalmonBgDark,
-    onSecondaryContainer = BentoDeepRedTextDark,
-    tertiaryContainer = BentoGreenBgDark,
-    onTertiaryContainer = BentoDeepGreenTextDark,
-    outline = BentoMutedTextDark
+    primary = StitchPrimaryDark,
+    secondary = StitchSecondaryDark,
+    tertiary = StitchTertiary,
+    background = StitchBackgroundDark,
+    surface = StitchSurfaceDark,
+    onPrimary = StitchOnPrimaryDark,
+    onSecondary = StitchOnSecondaryDark,
+    onTertiary = StitchOnTertiary,
+    primaryContainer = StitchPrimaryContainerDark,
+    onPrimaryContainer = StitchOnPrimaryContainerDark,
+    secondaryContainer = StitchSecondaryContainerDark,
+    onSecondaryContainer = StitchOnSecondaryContainerDark,
+    tertiaryContainer = StitchTertiaryContainer,
+    onTertiaryContainer = StitchOnTertiaryContainer,
+    outline = StitchOutlineDark,
+    outlineVariant = StitchOutlineVariantDark,
+    onBackground = StitchOnBackgroundDark,
+    onSurface = StitchOnSurfaceDark,
+    onSurfaceVariant = StitchOnSurfaceVariantDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = BentoBlueAccent,
-    secondary = BentoSalmonBg,
-    tertiary = BentoGreenBg,
-    background = BentoBgLight,
-    surface = Color.White,
-    onPrimary = Color.White,
-    onSecondary = BentoDeepRedText,
-    onTertiary = BentoDeepGreenText,
-    primaryContainer = BentoLightBlueBg,
-    onPrimaryContainer = BentoDeepBlueText,
-    secondaryContainer = BentoSalmonBg,
-    onSecondaryContainer = BentoDeepRedText,
-    tertiaryContainer = BentoGreenBg,
-    onTertiaryContainer = BentoDeepGreenText,
-    outline = BentoBorderColor
+    primary = StitchPrimary,
+    secondary = StitchSecondary,
+    tertiary = StitchTertiary,
+    background = StitchBackground,
+    surface = StitchSurface,
+    onPrimary = StitchOnPrimary,
+    onSecondary = StitchOnSecondary,
+    onTertiary = StitchOnTertiary,
+    primaryContainer = StitchPrimaryContainer,
+    onPrimaryContainer = StitchOnPrimaryContainer,
+    secondaryContainer = StitchSecondaryContainer,
+    onSecondaryContainer = StitchOnSecondaryContainer,
+    tertiaryContainer = StitchTertiaryContainer,
+    onTertiaryContainer = StitchOnTertiaryContainer,
+    outline = StitchOutline,
+    outlineVariant = StitchOutlineVariant,
+    onBackground = StitchOnBackground,
+    onSurface = StitchOnSurface,
+    onSurfaceVariant = StitchOnSurfaceVariant
 )
 
+/**
+ * Main application theme wrapper that applies CareFlow design tokens.
+ *
+ * @param darkTheme Determines whether to apply the dark color scheme.
+ * @param dynamicColor If true, attempts to apply Android 12+ dynamic system coloring (disabled by default).
+ * @param content Composable lambda structure containing screens to style.
+ */
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

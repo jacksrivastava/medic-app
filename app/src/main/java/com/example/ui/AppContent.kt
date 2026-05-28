@@ -105,87 +105,61 @@ fun MainAppContent(viewModel: MedViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 10.dp),
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = 20.dp, top = 12.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
+                    // Left: Clickable Patient Profile Avatar Bubble
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(android.graphics.Color.parseColor(activeProfile.colorHex)).copy(alpha = 0.15f))
+                            .border(2.dp, Color(android.graphics.Color.parseColor(activeProfile.colorHex)), CircleShape)
+                            .clickable { showProfileDialog = true }
+                            .testTag("patient_avatar_bubble"),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = "SECURITY RANK: HIPAA VAULT ACTIVE",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            style = androidx.compose.ui.text.TextStyle(letterSpacing = 1.3.sp)
+                            text = activeProfile.avatarInitials,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color(android.graphics.Color.parseColor(activeProfile.colorHex))
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Hello, ${activeProfile.name}",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        Color(android.graphics.Color.parseColor(activeProfile.colorHex)).copy(alpha = 0.15f),
-                                        RoundedCornerShape(6.dp)
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = activeProfile.bloodGroup,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(android.graphics.Color.parseColor(activeProfile.colorHex))
-                                )
-                            }
-                        }
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Center: CareFlow brand title
+                    Text(
+                        text = "CareFlow",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+
+                    // Right: Notification Bell Button
+                    IconButton(
+                        onClick = { showNotificationCenter = true },
+                        modifier = Modifier.testTag("inbox_button")
                     ) {
-                        IconButton(
-                            onClick = { showNotificationCenter = true },
-                            modifier = Modifier.testTag("inbox_button")
-                        ) {
-                            BadgedBox(
-                                badge = {
-                                    if (unreadNotificationsCount > 0) {
-                                        Badge {
-                                            Text(unreadNotificationsCount.toString())
-                                        }
+                        BadgedBox(
+                            badge = {
+                                if (unreadNotificationsCount > 0) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text(unreadNotificationsCount.toString())
                                     }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = "Reminder logs",
-                                    tint = MaterialTheme.colorScheme.onBackground,
-                                    modifier = Modifier.size(26.dp)
-                                )
                             }
-                        }
-
-                        // Patient Avatar Profile selector bubble
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(Color(android.graphics.Color.parseColor(activeProfile.colorHex)).copy(alpha = 0.2f))
-                                .border(1.5.dp, Color(android.graphics.Color.parseColor(activeProfile.colorHex)), CircleShape)
-                                .clickable { showProfileDialog = true }
-                                .testTag("patient_avatar_bubble"),
-                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = activeProfile.avatarInitials,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
-                                color = Color(android.graphics.Color.parseColor(activeProfile.colorHex))
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Reminder logs",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -1095,6 +1069,13 @@ fun IdentityParamRow(label: String, valStr: String) {
     }
 }
 
+/**
+ * Main console dashboard displaying clinical metrics, routine medication checkmarks,
+ * bento analytics graphs, and next upcoming physician checks.
+ *
+ * @param viewModel The state viewmodel containing patients' data logic.
+ * @param onScanShortcutClicked Callback triggered when seeking prescription AI scanning intake.
+ */
 @Composable
 fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) {
     val context = LocalContext.current
@@ -1107,6 +1088,9 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
 
     val nextAppointment = filteredAppts.sortedBy { it.date }.firstOrNull { !it.isCompleted }
     val activeReminders = filteredReminders.filter { it.isActive }
+    
+    // Remember which reminders have been taken today to drive the interactive routine checklist
+    val takenReminders = remember { mutableStateMapOf<Int, Boolean>() }
 
     LazyColumn(
         modifier = Modifier
@@ -1114,36 +1098,140 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Welcome and Status Banner (Bento Scan Card Style)
+        // Welcome Greeting Header (Stitch bento style alignment)
+        item {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                Text(
+                    text = "Good morning,",
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = activeProfile.name,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+
+        // QR Code Section (Bento Style matching Stitch Patient Dashboard)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "SCAN FOR MEDICAL PROFILE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = androidx.compose.ui.text.TextStyle(letterSpacing = 1.5.sp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Box(
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Generate deterministic barcode pattern based on active profile metadata
+                        Canvas(
+                            modifier = Modifier
+                                .size(150.dp)
+                                .background(Color.White)
+                        ) {
+                            val blockCount = 10
+                            val blockSize = size.width / blockCount
+                            for (x in 0 until blockCount) {
+                                for (y in 0 until blockCount) {
+                                    val r = Random((activeProfile.name.hashCode() + (x * 33) + y).toLong())
+                                    val paintBlack = r.nextBoolean() || (x in 0..2 && y in 0..2) || (x in 7..9 && y in 0..2) || (x in 0..2 && y in 7..9)
+                                    if (paintBlack) {
+                                        drawRect(
+                                            color = Color.Black,
+                                            topLeft = Offset(x * blockSize, y * blockSize),
+                                            size = androidx.compose.ui.geometry.Size(blockSize, blockSize)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            tint = MaterialTheme.colorScheme.primary,
+                            contentDescription = "Security status indicator badge",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Secure Access Ready",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+
+        // Welcome and Status Banner (Prescription Scanner Bento cell)
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("welcome_card"),
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSystemInDarkTheme()) BentoBackboneDark else BentoBackboneLight
-                )
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onScanShortcutClicked() }
-                        .padding(20.dp),
+                        .padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Scan Icon",
+                            contentDescription = "Prescription scanner click shortcut",
                             tint = Color.White,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
@@ -1152,44 +1240,38 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                     ) {
                         Text(
                             text = "Scan Prescription",
-                            fontSize = 18.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Instant medication schedule entry via AI OCR",
+                            text = "Extract schedule via AI OCR",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         
                         Button(
                             onClick = onScanShortcutClicked,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
                             ),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("scan_shortcut_btn")
                         ) {
-                            Icon(imageVector = Icons.Default.Search, contentDescription = "Scan")
+                            Icon(imageVector = Icons.Default.Search, contentDescription = "Scan", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Add Record by Prescription Scan", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Scan Intake Prescription", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Go",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
                 }
             }
         }
 
-        // Action Progress Overview (Red-Salmon & Green-Pastel Bento cells)
+        // Action Progress Overview (Bento cells)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1199,11 +1281,12 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(140.dp),
-                    shape = RoundedCornerShape(28.dp),
+                        .height(130.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSystemInDarkTheme()) BentoSalmonBgDark else BentoSalmonBg
-                    )
+                    ),
+                    border = BorderStroke(1.dp, if (isSystemInDarkTheme()) Color.Transparent else BentoBorderColor.copy(alpha = 0.3f))
                 ) {
                     Column(
                         modifier = Modifier
@@ -1213,31 +1296,31 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(Color.White.copy(alpha = 0.4f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Notifications,
                                 tint = if (isSystemInDarkTheme()) BentoDeepRedTextDark else BentoDeepRedText,
-                                contentDescription = "reminders",
-                                modifier = Modifier.size(18.dp)
-                              )
+                                contentDescription = "reminders metric badge",
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                         Column {
                             Text(
-                                text = "${activeReminders.size} Active Alarms",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
+                                text = "${activeReminders.size} Alarms",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
                                 color = if (isSystemInDarkTheme()) BentoDeepRedTextDark else BentoDeepRedText,
-                                lineHeight = 18.sp
+                                lineHeight = 16.sp
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Medication reminders running",
+                                text = "Reminders active",
                                 fontSize = 11.sp,
-                                color = (if (isSystemInDarkTheme()) BentoDeepRedTextDark else BentoDeepRedText).copy(alpha = 0.7f)
+                                color = (if (isSystemInDarkTheme()) BentoDeepRedTextDark else BentoDeepRedText).copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -1248,11 +1331,12 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                 Card(
                     modifier = Modifier
                         .weight(1f)
-                        .height(140.dp),
-                    shape = RoundedCornerShape(28.dp),
+                        .height(130.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSystemInDarkTheme()) BentoGreenBgDark else BentoGreenBg
-                    )
+                    ),
+                    border = BorderStroke(1.dp, if (isSystemInDarkTheme()) Color.Transparent else BentoBorderColor.copy(alpha = 0.3f))
                 ) {
                     Column(
                         modifier = Modifier
@@ -1262,31 +1346,31 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(Color.White.copy(alpha = 0.4f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 tint = if (isSystemInDarkTheme()) BentoDeepGreenTextDark else BentoDeepGreenText,
-                                contentDescription = "visits",
-                                modifier = Modifier.size(18.dp)
+                                contentDescription = "completed appointment badge",
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                         Column {
                             Text(
-                                text = "$completedAppointmentsVal Completed",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
+                                text = "$completedAppointmentsVal Visits",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
                                 color = if (isSystemInDarkTheme()) BentoDeepGreenTextDark else BentoDeepGreenText,
-                                lineHeight = 18.sp
+                                lineHeight = 16.sp
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Doctor visits registered",
+                                text = "Completed visits",
                                 fontSize = 11.sp,
-                                color = (if (isSystemInDarkTheme()) BentoDeepGreenTextDark else BentoDeepGreenText).copy(alpha = 0.7f)
+                                color = (if (isSystemInDarkTheme()) BentoDeepGreenTextDark else BentoDeepGreenText).copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -1294,7 +1378,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             }
         }
 
-        // BENTO STYLE HEALTH ANALYTICS WIDGET (Feature 12: Custom graphics on canvas displaying BP, blood sugar, & adherence index)
+        // BENTO STYLE HEALTH ANALYTICS WIDGET
         item {
             HealthAnalyticsWidget(
                 profileName = activeProfile.name,
@@ -1302,7 +1386,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             )
         }
 
-        // Active Reminders dispatcher with simulation trigger!
+        // Daily Reminders checklist area
         item {
             Spacer(modifier = Modifier.height(4.dp))
             Row(
@@ -1311,22 +1395,22 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Today's Medicating Routine",
-                    fontWeight = FontWeight.ExtraBold,
+                    text = "Daily Routine",
+                    fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 
                 Box(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "FAMILY ASSOC: ${activeProfile.name.uppercase()}",
+                        text = activeProfile.name.uppercase(),
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -1336,9 +1420,9 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Box(
                         modifier = Modifier
@@ -1347,9 +1431,9 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "No active medication scheduling. Scan a prescription to configure standard medication alerts.",
+                            text = "No active reminders. Scan a prescription to parse schedule alerts automatically.",
                             textAlign = TextAlign.Center,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1357,6 +1441,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             }
         } else {
             items(activeReminders) { reminder ->
+                val isTaken = takenReminders[reminder.id] ?: false
                 var stockCount by remember(reminder.id) { 
                     mutableStateOf(if (reminder.medicationName.contains("Lisinopril", ignoreCase = true) || reminder.medicationName.contains("Inhaler", ignoreCase = true)) 4 else 28) 
                 }
@@ -1365,10 +1450,16 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 6.dp)
+                        .clickable { takenReminders[reminder.id] = !isTaken }
                         .testTag("dashboard_reminder_card_${reminder.id}"),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isTaken) MaterialTheme.colorScheme.surface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isTaken) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -1381,66 +1472,76 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                // Circular icon
                                 Box(
                                     modifier = Modifier
-                                        .size(44.dp)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isTaken) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.primary,
+                                            shape = CircleShape
+                                        )
                                         .background(
-                                            MaterialTheme.colorScheme.primaryContainer,
-                                            CircleShape
+                                            if (isTaken) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "💊",
-                                        fontSize = 18.sp
-                                    )
+                                    if (isTaken) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Remind checkmark completed flag",
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Medication alarm scheduler icon marker",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
                                         text = reminder.medicationName,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        fontSize = 15.sp,
+                                        color = if (isTaken) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                                        style = if (isTaken) androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough) else androidx.compose.ui.text.TextStyle.Default
                                     )
                                     Text(
-                                        text = "${reminder.dosage} • Alarms: ${reminder.specificTimes}",
+                                        text = if (isTaken) "Completed • ${reminder.dosage}" else "Upcoming • ${reminder.specificTimes}",
                                         fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isTaken) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.primary,
+                                        fontWeight = if (isTaken) FontWeight.Normal else FontWeight.SemiBold
                                     )
                                 }
                             }
 
-                            // Simulation button that triggers an actual system notification!
-                            Button(
+                            // Simulation trigger for notification push check
+                            IconButton(
                                 onClick = {
                                     viewModel.simulateMedicationReminderTrigger(context, reminder)
-                                    Toast.makeText(context, "Push Alert fired for ${reminder.medicationName}!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Fired simulation push for ${reminder.medicationName}!", Toast.LENGTH_SHORT).show()
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 modifier = Modifier.testTag("test_push_btn_${reminder.id}")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Fires Alert",
-                                    modifier = Modifier.size(16.dp)
+                                    contentDescription = "Test Notification dispatch trigger",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Test Push", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Pill inventory stock section (Feature 11: Stock alerts and replenish action buttons)
+                        // Stock counts tracker panel
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1449,19 +1550,19 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Info, 
-                                    contentDescription = "Inventory Tracker",
+                                    contentDescription = "Inventory levels alerts tracker",
                                     tint = if (stockCount <= 5) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = if (stockCount <= 5) {
-                                        "⚠️ Only $stockCount Tablets Left! (Replenish Needed)"
+                                        "⚠️ Only $stockCount Left! (Replenish Needed)"
                                     } else {
                                         "Stock Inventory: $stockCount Pills remaining"
                                     },
                                     fontSize = 11.sp,
-                                    fontWeight = if (stockCount <= 5) FontWeight.ExtraBold else FontWeight.Normal,
+                                    fontWeight = if (stockCount <= 5) FontWeight.Bold else FontWeight.Normal,
                                     color = if (stockCount <= 5) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -1472,11 +1573,11 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                                     Toast.makeText(context, "Inventory restocked (+30 Pills) for ${reminder.medicationName}!", Toast.LENGTH_SHORT).show()
                                 },
                                 shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Icon(imageVector = Icons.Default.Add, contentDescription = "Add Stock", modifier = Modifier.size(12.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Refill Stock (+30)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Refill (+30)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1484,12 +1585,12 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             }
         }
 
-        // Next Doctor Visit Tracking
+        // Next Doctor Visit Tracking bento cell
         item {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Next Upcoming Doctor Checkup",
-                fontWeight = FontWeight.ExtraBold,
+                text = "Next Checkup",
+                fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -1501,10 +1602,11 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("next_appt_card"),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSystemInDarkTheme()) BentoLightBlueBgDark else BentoLightBlueBg
-                    )
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp)
@@ -1517,23 +1619,23 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .background(Color.White.copy(alpha = 0.5f))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
                                 Text(
-                                    text = "NEXT APPOINTMENT",
+                                    text = "UPCOMING",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText,
+                                    color = MaterialTheme.colorScheme.primary,
                                     style = androidx.compose.ui.text.TextStyle(letterSpacing = 1.sp)
                                 )
                             }
 
                             Icon(
                                 imageVector = Icons.Default.DateRange,
-                                tint = if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText,
-                                contentDescription = "Calendar",
-                                modifier = Modifier.size(20.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                contentDescription = "Doctor consult check schedule marker icon",
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -1541,49 +1643,48 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
 
                         Text(
                             text = nextAppointment.doctorName,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 22.sp,
-                            color = if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = nextAppointment.specialty,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = (if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText).copy(alpha = 0.8f)
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "Date: ${nextAppointment.date} at ${nextAppointment.time}",
-                            fontSize = 13.sp,
-                            color = (if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText).copy(alpha = 0.8f)
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         if (nextAppointment.notes.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Instructions & Prep: ${nextAppointment.notes}",
-                                fontSize = 12.sp,
-                                color = (if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText).copy(alpha = 0.7f)
+                                text = "Instructions: ${nextAppointment.notes}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(18.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .background(if (isSystemInDarkTheme()) BentoBlueAccentDark else BentoDeepBlueText)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primary)
                                     .clickable {
                                         Toast.makeText(context, "Checked-in successfully!", Toast.LENGTH_SHORT).show()
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 Text(
                                     text = "Check-in",
-                                    color = if (isSystemInDarkTheme()) BentoDeepBlueText else Color.White,
+                                    color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1591,16 +1692,17 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
 
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .background(Color.White.copy(alpha = 0.3f))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                                     .clickable {
                                         Toast.makeText(context, "Map direction loading...", Toast.LENGTH_SHORT).show()
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 Text(
                                     text = "Map Direction",
-                                    color = if (isSystemInDarkTheme()) BentoDeepBlueTextDark else BentoDeepBlueText,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1611,9 +1713,9 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
             } else {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Box(
                         modifier = Modifier
@@ -1624,7 +1726,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                         Text(
                             text = "No pending doctor appointments scheduled.",
                             textAlign = TextAlign.Center,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1636,16 +1738,16 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSystemInDarkTheme()) BentoBackboneDark else Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
-                border = BorderStroke(1.dp, if (isSystemInDarkTheme()) Color.Transparent else BentoBorderColor)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp),
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -1656,7 +1758,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(BentoBlueAccentDark)
+                                .background(MaterialTheme.colorScheme.primary)
                                 .border(1.5.dp, Color.White, CircleShape)
                         )
                         Box(
@@ -1664,7 +1766,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                                 .padding(start = 14.dp)
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFB4B1B8))
+                                .background(MaterialTheme.colorScheme.secondary)
                                 .border(1.5.dp, Color.White, CircleShape)
                         )
                     }
@@ -1690,7 +1792,7 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
                     Icon(
                         imageVector = Icons.Default.Settings,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        contentDescription = "Sharing Settings",
+                        contentDescription = "Sharing settings controller toggle button",
                         modifier = Modifier
                             .size(20.dp)
                             .clickable {
@@ -1703,6 +1805,12 @@ fun DashboardScreen(viewModel: MedViewModel, onScanShortcutClicked: () -> Unit) 
     }
 }
 
+/**
+ * Screen enabling patients to scan physical or digital prescriptions using Gemini AI OCR.
+ * Extracted parameters are displayed in a structured preview card for client verification.
+ *
+ * @param viewModel The state viewmodel containing prescription ingestion logic.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PrescriptionScannerScreen(viewModel: MedViewModel) {
@@ -1715,13 +1823,13 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
     var selectImageBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectImageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
-    // Launcher for selecting prescription photos from device gallery!
+    // Register intent launcher to load client image attachments securely from scoped storage permissions context
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
             selectedImageUri = uri
-            selectImageBitmap = null // Clear camera photo
+            selectImageBitmap = null
             try {
                 val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
                 val bytes = inputStream?.readBytes()
@@ -1732,13 +1840,13 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
         }
     }
 
-    // Launcher for taking prescription photos using device's camera!
+    // Register hardware capture handler to allow immediate processing of print prescriptions in clinical contexts
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
             selectImageBitmap = bitmap
-            selectedImageUri = null // Clear gallery URI
+            selectedImageUri = null
             try {
                 val outputStream = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
@@ -1749,7 +1857,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
         }
     }
 
-    // High fidelity presets for instant scanning showcase
+    // Populate mocked clinical profiles to facilitate manual testing and demo evaluation without physical documentation
     val presets = listOf(
         Triple(
             "Amoxicillin Care Plan",
@@ -1788,25 +1896,25 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
             )
         }
 
-        // Show parsing states dynamically
+        // Switch layout state to render progress trackers or structured output validation fields
         when (val state = scanUiState) {
             is ScanUiState.Idle -> {
-                // Interactive dual image source options
+                // Provide alternative entry vectors for users who have either physical forms or digital copies
                 if (selectedImageUri == null && selectImageBitmap == null) {
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Camera trigger card
+                            // Capture physical print forms directly via lens alignment
                             Card(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable { cameraLauncher.launch(null) }
                                     .testTag("camera_picker_card"),
                                 shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
-                                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.08f)),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -1816,10 +1924,10 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.PlayArrow, // camera snapshot accent
+                                        imageVector = Icons.Default.PlayArrow,
                                         tint = MaterialTheme.colorScheme.primary,
                                         contentDescription = "Camera capture",
-                                        modifier = Modifier.size(36.dp)
+                                        modifier = Modifier.size(32.dp)
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
@@ -1838,7 +1946,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                 }
                             }
 
-                            // Gallery trigger card
+                            // Retrieve existing records from client photo libraries
                             Card(
                                 modifier = Modifier
                                     .weight(1f)
@@ -1846,7 +1954,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                     .testTag("gallery_picker_card"),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -1859,7 +1967,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                         imageVector = Icons.Default.Add,
                                         tint = MaterialTheme.colorScheme.secondary,
                                         contentDescription = "Gallery Picker",
-                                        modifier = Modifier.size(36.dp)
+                                        modifier = Modifier.size(32.dp)
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
@@ -1884,7 +1992,8 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -1894,7 +2003,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                             ) {
                                 AsyncImage(
                                     model = selectImageBitmap ?: selectedImageUri,
-                                    contentDescription = "Selected Prescription",
+                                    contentDescription = "Selected Prescription preview thumbnail",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(180.dp)
@@ -1909,7 +2018,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         tint = MaterialTheme.colorScheme.secondary,
-                                        contentDescription = "Done"
+                                        contentDescription = "Done success indicator icon"
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
@@ -1930,7 +2039,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                     }
                 }
 
-                // TextInput alternative
+                // Supply manual input window for copy-pasting digital prescription notes directly
                 item {
                     Text(
                         text = "Or Paste Prescription / Care Instructions Text",
@@ -1955,7 +2064,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                     )
                 }
 
-                // AI Scanning Action Trigger
+                // Dispatch extraction request to unstructured data segmentation model
                 item {
                     Button(
                         onClick = {
@@ -1973,15 +2082,15 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                             .fillMaxWidth()
                             .testTag("start_scan_button")
                     ) {
-                        Icon(imageVector = Icons.Default.Search, contentDescription = "Parse")
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "Parse", modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Extract Medical Schedules", fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // Show Presets Showcase Section
+                // Expose pre-configured inputs to enable rapid integration testing
                 item {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Text(
                         text = "Instant Testing Presets",
                         fontWeight = FontWeight.Bold,
@@ -2038,7 +2147,8 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Column(
                             modifier = Modifier
@@ -2047,10 +2157,11 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
+                            // Indicate ingestion progress while backend call runs asynchronously
                             CircularProgressIndicator(
                                 color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 5.dp,
-                                modifier = Modifier.size(54.dp)
+                                strokeWidth = 4.dp,
+                                modifier = Modifier.size(48.dp)
                             )
                             Spacer(modifier = Modifier.height(24.dp))
                             Text(
@@ -2073,6 +2184,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
             is ScanUiState.Success -> {
                 val data = state.result
                 item {
+                    // Group identified medication parameters for validation before database commit
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2096,12 +2208,11 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    contentDescription = "Success"
+                                    contentDescription = "Success check indicator badge icon"
                                 )
                             }
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Med details block
                             Text(
                                 text = "Medication Name",
                                 fontSize = 11.sp,
@@ -2186,10 +2297,10 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                 fontSize = 13.sp
                             )
 
-                            // Suggested Appointment details block if flagged!
+                            // Auto-populate diagnostic checkup alerts if follow-up intervals were detected in source text
                             if (data.hasAppointment) {
                                 Spacer(modifier = Modifier.height(16.dp))
-                                Divider()
+                                Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
                                     text = "Auto-Scheduled Follow-Up Appointment",
@@ -2204,7 +2315,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.Face,
                                         tint = MaterialTheme.colorScheme.tertiary,
-                                        contentDescription = "Doctor"
+                                        contentDescription = "Doctor avatar image checkup badge"
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
@@ -2223,7 +2334,7 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
-                            Divider()
+                            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
@@ -2287,7 +2398,8 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
                             Text(
@@ -2309,12 +2421,12 @@ fun PrescriptionScannerScreen(viewModel: MedViewModel) {
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
+                }/**
+ * Screen containing clinical records and laboratory test panels of the patient.
+ * Users can search files by keywords, filter categories, and manually attach AES-encrypted documents.
+ *
+ * @param viewModel The state viewmodel containing records data queries.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MedicalRecordsScreen(viewModel: MedViewModel) {
@@ -2324,7 +2436,7 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
     var selectedCategory by remember { mutableStateOf("All") }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    // Manual add records fields
+    // State holders for manual document entry form parameters
     var titleInput by remember { mutableStateOf("") }
     var typeInput by remember { mutableStateOf("Clinical Notes") }
     var notesInput by remember { mutableStateOf("") }
@@ -2360,7 +2472,8 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                 onClick = { showAddDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("add_record_fab")
+                modifier = Modifier.testTag("add_record_fab"),
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Add Medical Record")
             }
@@ -2387,7 +2500,7 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Interactive Search layout
+            // Supply reactive filtering field targeting titles, notes, and types
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -2396,12 +2509,16 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                     .testTag("records_search_bar"),
                 placeholder = { Text("Search through reports & pills...") },
                 leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                )
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Cat pills filters
+            // Display horizontal categorization row using standard design chips
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2431,7 +2548,7 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "Empty",
+                            contentDescription = "Empty list icon",
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
@@ -2454,7 +2571,7 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
             }
         }
 
-        // Add manual record modal
+        // Render overlay dialog containing manual insertion fields
         if (showAddDialog) {
             Dialog(onDismissRequest = { showAddDialog = false }) {
                 Card(
@@ -2462,7 +2579,8 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                         .fillMaxWidth()
                         .testTag("add_record_dialog"),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
                         modifier = Modifier
@@ -2483,7 +2601,8 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                             label = { Text("Record Document Title") },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .testTag("record_title_input")
+                                .testTag("record_title_input"),
+                            shape = RoundedCornerShape(12.dp)
                         )
 
                         Text("Select Document Category Type", fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -2498,20 +2617,24 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                                 FilterChip(
                                     selected = typeInput == t,
                                     onClick = { typeInput = t },
-                                    label = { Text(t) }
+                                    label = { Text(t) },
+                                    shape = RoundedCornerShape(8.dp)
                                 )
                             }
-                                          OutlinedTextField(
+                        }
+
+                        OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
                             label = { Text("Patient Clinical Observations Notes") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(100.dp)
-                                .testTag("record_notes_input")
+                                .testTag("record_notes_input"),
+                            shape = RoundedCornerShape(12.dp)
                         )
 
-                        // HIPAA Encrypted File Attachment Module
+                        // Encrypt physical or local file path references before database storage
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "🔒 Encrypted HIPAA Storage Vault",
@@ -2527,15 +2650,16 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                                     .testTag("attach_file_btn"),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Add, contentDescription = "Add File Icon")
+                                Icon(imageVector = Icons.Default.Add, contentDescription = "Add File Icon", modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Attach Lab Report, History or Imaging File", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         } else {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.08f)),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(10.dp),
@@ -2544,7 +2668,7 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         tint = MaterialTheme.colorScheme.secondary,
-                                        contentDescription = "Attached successful check"
+                                        contentDescription = "Attached successful check indicator icon"
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
@@ -2576,7 +2700,8 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                                     attachedFileNameInput = ""
                                     showAddDialog = false
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("Discard")
                             }
@@ -2599,11 +2724,12 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
                                 },
                                 modifier = Modifier
                                     .weight(1.5f)
-                                    .testTag("save_manual_record_btn")
+                                    .testTag("save_manual_record_btn"),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("Save Document")
                             }
-                        }        }
+                        }
                     }
                 }
             }
@@ -2611,6 +2737,13 @@ fun MedicalRecordsScreen(viewModel: MedViewModel) {
     }
 }
 
+/**
+ * Clickable item card representing a clinical medical record document.
+ * Toggles expanded mode on click to show scanned metadata and decrypted files.
+ *
+ * @param record The medical record entity.
+ * @param onDelete Callback triggered when requesting deletion.
+ */
 @Composable
 fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -2634,7 +2767,8 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
             .clickable { isExpanded = !isExpanded }
             .testTag("record_card_${record.id}"),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -2659,27 +2793,28 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+                                .border(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "🔒 Hardware AES Encrypted",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
                 }
 
-                // Document type badge
+                // Categorize document types using contrasting contextual colors
                 Text(
                     text = record.type,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = badgeColor,
                     modifier = Modifier
-                        .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .background(badgeColor.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
@@ -2696,7 +2831,7 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
             if (isExpanded) {
                 if (record.rawExtractedContent.isNotBlank()) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Scanned Meta Info:",
@@ -2712,10 +2847,10 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                     )
                 }
 
-                // Render secure file attachments if present on this record
+                // Decrypt file bytes in memory context using secure store access key credentials
                 if (record.attachmentPath.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
@@ -2727,7 +2862,7 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 tint = MaterialTheme.colorScheme.secondary,
-                                contentDescription = "Secure attached file icon",
+                                contentDescription = "Secure attached file icon success checkmark badge",
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -2777,14 +2912,14 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                                 enabled = !isDecrypting,
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
                                     .height(30.dp)
                                     .testTag("decrypt_btn_${record.id}")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Unlock",
+                                    contentDescription = "Unlock action icon",
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -2807,13 +2942,13 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                         }
                     }
 
-                    // Decrypted content render box
+                    // Switch rendering depending on decrypted byte mime-type (imaging vs text)
                     if (decryptedBitmap != null || decryptedText != null || decryptionError != null) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                            shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f))
                         ) {
                             Column(modifier = Modifier.padding(10.dp)) {
@@ -2824,7 +2959,7 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                                     Icon(
                                         imageVector = Icons.Default.Info,
                                         tint = MaterialTheme.colorScheme.secondary,
-                                        contentDescription = "Shield Verified Logo",
+                                        contentDescription = "Shield Verified Logo info icon decoration",
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -2840,11 +2975,11 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                                 if (decryptedBitmap != null) {
                                     Image(
                                         bitmap = decryptedBitmap!!.asImageBitmap(),
-                                        contentDescription = "Decrypted record document",
+                                        contentDescription = "Decrypted record document image preview",
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(200.dp)
-                                            .clip(RoundedCornerShape(6.dp)),
+                                            .clip(RoundedCornerShape(8.dp)),
                                         contentScale = ContentScale.Fit
                                     )
                                 } else if (decryptedText != null) {
@@ -2877,7 +3012,7 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete prescription record",
+                            contentDescription = "Delete prescription record deletion request button",
                             tint = MaterialTheme.colorScheme.error
                         )
                     }
@@ -2887,18 +3022,25 @@ fun MedicalRecordItemCard(record: MedicalRecord, onDelete: () -> Unit) {
     }
 }
 
+/**
+ * Renders the CareFlow clinical appointments and medication reminders schedules dashboard.
+ * Offers tabbed sub-sections to view upcoming doctor visits and toggle active/inactive medication alarms.
+ *
+ * @param viewModel The shared model state context holding the active records and trigger actions.
+ */
 @Composable
 fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
     val rawAppointments by viewModel.appointments.collectAsStateWithLifecycle()
     val rawReminders by viewModel.medicationReminders.collectAsStateWithLifecycle()
     val activeProfile by viewModel.activeProfile.collectAsStateWithLifecycle()
 
+    // Filter schedules to only show details corresponding to the active patient profile context
     val appointments = rawAppointments.filter { it.profileName == activeProfile.name }
     val reminders = rawReminders.filter { it.profileName == activeProfile.name }
 
     var showAddApptDialog by remember { mutableStateOf(false) }
 
-    // Manual appointment form fields
+    // local form fields to support manual input state management inside the booking dialog
     var docNameInput by remember { mutableStateOf("") }
     var docSpecialtyInput by remember { mutableStateOf("") }
     var docDateInput by remember { mutableStateOf("") }
@@ -2915,6 +3057,7 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                     onClick = { showAddApptDialog = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.testTag("add_appointment_fab")
                 ) {
                     Icon(imageVector = Icons.Default.Add, contentDescription = "Add Doctor Appointment")
@@ -2930,7 +3073,7 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                 .padding(16.dp)
         ) {
             Text(
-                text = "Medkeeper Patient Schedules",
+                text = "CareFlow Patient Schedules",
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
                 color = MaterialTheme.colorScheme.onBackground
@@ -2943,23 +3086,36 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Sub-navigation chip selectors
+            // Tab bar layout to segment the different types of schedule records for easy visibility
             TabRow(
                 selectedTabIndex = if (selectedSection == "Appointments") 0 else 1,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             ) {
                 Tab(
                     selected = selectedSection == "Appointments",
                     onClick = { selectedSection = "Appointments" },
-                    text = { Text("Clinical Visits", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            text = "Clinical Visits",
+                            fontWeight = if (selectedSection == "Appointments") FontWeight.Bold else FontWeight.Medium,
+                            color = if (selectedSection == "Appointments") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.testTag("section_appointments_tab")
                 )
                 Tab(
                     selected = selectedSection == "Alarms",
                     onClick = { selectedSection = "Alarms" },
-                    text = { Text("Med Reminders", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            text = "Med Reminders",
+                            fontWeight = if (selectedSection == "Alarms") FontWeight.Bold else FontWeight.Medium,
+                            color = if (selectedSection == "Alarms") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.testTag("section_alerts_tab")
                 )
             }
@@ -3025,7 +3181,7 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
             }
         }
 
-        // Add manual Doctor appointment Dialog
+        // Add manual Doctor appointment Dialog to let users book consultations directly
         if (showAddApptDialog) {
             Dialog(onDismissRequest = { showAddApptDialog = false }) {
                 Card(
@@ -3033,6 +3189,7 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                         .fillMaxWidth()
                         .testTag("add_appt_dialog"),
                     shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(
@@ -3042,7 +3199,7 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Plan Doctor Consulta Book",
+                            text = "Schedule Clinical Appointment",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = MaterialTheme.colorScheme.primary
@@ -3052,6 +3209,11 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                             value = docNameInput,
                             onValueChange = { docNameInput = it },
                             label = { Text("Doctor Name") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("doc_name_input")
@@ -3061,6 +3223,11 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                             value = docSpecialtyInput,
                             onValueChange = { docSpecialtyInput = it },
                             label = { Text("Clinic Specialty") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("doc_specialty_input")
@@ -3070,6 +3237,11 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                             value = docDateInput,
                             onValueChange = { docDateInput = it },
                             label = { Text("Checkup Date (e.g., 2026-06-25)") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("doc_date_input")
@@ -3079,6 +3251,11 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                             value = docTimeInput,
                             onValueChange = { docTimeInput = it },
                             label = { Text("Time (e.g., 10:30 AM)") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("doc_time_input")
@@ -3088,6 +3265,11 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                             value = docLocationInput,
                             onValueChange = { docLocationInput = it },
                             label = { Text("Location Clinic Suite Building") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("doc_location_input")
@@ -3097,6 +3279,11 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                             value = docNotesInput,
                             onValueChange = { docNotesInput = it },
                             label = { Text("Medical Prep instructions") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("doc_notes_input")
@@ -3108,6 +3295,7 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                         ) {
                             OutlinedButton(
                                 onClick = { showAddApptDialog = false },
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Discard")
@@ -3134,9 +3322,10 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
                                         showAddApptDialog = false
                                     }
                                 },
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .weight(1.5f)
-                                        .testTag("save_manual_appt_btn")
+                                    .testTag("save_manual_appt_btn")
                             ) {
                                 Text("Save Visit")
                             }
@@ -3148,6 +3337,14 @@ fun AppointmentsAndAlarmsScreen(viewModel: MedViewModel) {
     }
 }
 
+/**
+ * Renders an individual clinical appointment item.
+ * Includes a checkbox to mark completion status and a quick action to remove the entry.
+ *
+ * @param appt The clinical doctor appointment entity model.
+ * @param onCheckToggle Callback invoked to toggle the appointment checkmark status.
+ * @param onDelete Callback invoked to remove the appointment from schedule context.
+ */
 @Composable
 fun AppointmentItemCard(appt: DoctorAppointment, onCheckToggle: () -> Unit, onDelete: () -> Unit) {
     Card(
@@ -3155,8 +3352,13 @@ fun AppointmentItemCard(appt: DoctorAppointment, onCheckToggle: () -> Unit, onDe
             .fillMaxWidth()
             .testTag("appt_card_${appt.id}"),
         shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
-            containerColor = if (appt.isCompleted) MaterialTheme.colorScheme.surface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface
+            containerColor = if (appt.isCompleted) {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -3169,14 +3371,16 @@ fun AppointmentItemCard(appt: DoctorAppointment, onCheckToggle: () -> Unit, onDe
                     Checkbox(
                         checked = appt.isCompleted,
                         onCheckedChange = { onCheckToggle() },
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.testTag("appt_checkbox_${appt.id}")
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
                             text = appt.doctorName,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
+                            color = if (appt.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
                             style = if (appt.isCompleted) MaterialTheme.typography.bodyLarge.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough) else MaterialTheme.typography.bodyLarge
                         )
                         Text(
@@ -3191,17 +3395,25 @@ fun AppointmentItemCard(appt: DoctorAppointment, onCheckToggle: () -> Unit, onDe
                     onClick = onDelete,
                     modifier = Modifier.testTag("delete_appt_btn_${appt.id}")
                 ) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete appointment", tint = MaterialTheme.colorScheme.error)
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete appointment",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "📅 ${appt.date} • ⏰ ${appt.time}",
+                    text = "📅 ${appt.date}  •  ⏰ ${appt.time}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -3216,17 +3428,33 @@ fun AppointmentItemCard(appt: DoctorAppointment, onCheckToggle: () -> Unit, onDe
             }
 
             if (appt.notes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Prep Instructions: ${appt.notes}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Prep Instructions: ${appt.notes}",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * Renders an individual medication reminder alarm configuration card.
+ * Displays duration details and specific schedule timings with a switch to activate/deactivate.
+ *
+ * @param reminder The medication reminder entity details.
+ * @param onActiveToggle Callback invoked when the active state switch is flipped.
+ * @param onDelete Callback invoked to delete the reminder alarm mapping.
+ */
 @Composable
 fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, onDelete: () -> Unit) {
     Card(
@@ -3234,7 +3462,10 @@ fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, o
             .fillMaxWidth()
             .testTag("reminder_card_${reminder.id}"),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (reminder.isActive) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -3246,7 +3477,8 @@ fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, o
                     Text(
                         text = reminder.medicationName,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                        fontSize = 18.sp,
+                        color = if (reminder.isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     Text(
                         text = "Dosage: ${reminder.dosage}",
@@ -3259,12 +3491,16 @@ fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, o
                 Switch(
                     checked = reminder.isActive,
                     onCheckedChange = { onActiveToggle() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
                     modifier = Modifier.testTag("reminder_switch_${reminder.id}")
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -3275,7 +3511,7 @@ fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, o
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "__ ${reminder.specificTimes} __",
+                        text = "⏰ ${reminder.specificTimes}",
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 14.sp
@@ -3298,11 +3534,19 @@ fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, o
 
             if (reminder.patientNotes.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Patient Instructions: ${reminder.patientNotes}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Patient Instructions: ${reminder.patientNotes}",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -3314,7 +3558,11 @@ fun ReminderItemCard(reminder: MedicationReminder, onActiveToggle: () -> Unit, o
                     onClick = onDelete,
                     modifier = Modifier.testTag("delete_reminder_btn_${reminder.id}")
                 ) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete reminder alarm", tint = MaterialTheme.colorScheme.error)
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete reminder alarm",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                    )
                 }
             }
         }
