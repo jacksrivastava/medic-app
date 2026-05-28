@@ -12,7 +12,8 @@ data class MedicalRecord(
     val patientNotes: String,
     val rawExtractedContent: String = "",
     val attachedFileName: String = "",
-    val attachmentPath: String = ""
+    val attachmentPath: String = "",
+    val profileName: String = "Sarah"
 )
 
 @Entity(tableName = "doctor_appointments")
@@ -24,7 +25,8 @@ data class DoctorAppointment(
     val time: String, // e.g., "14:30"
     val location: String,
     val notes: String = "",
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val profileName: String = "Sarah"
 )
 
 @Entity(tableName = "medication_reminders")
@@ -37,7 +39,8 @@ data class MedicationReminder(
     val specificTimes: String, // Comma-separated list like "08:00,20:00"
     val nextReminderTime: Long = 0L, // Unix timestamp in milliseconds for sorting & triggering
     val patientNotes: String = "",
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val profileName: String = "Sarah"
 )
 
 @Entity(tableName = "notification_logs")

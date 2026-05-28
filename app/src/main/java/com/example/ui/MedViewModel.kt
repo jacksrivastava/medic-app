@@ -42,7 +42,109 @@ data class ScannedPrescription(
     val appointmentNotes: String
 )
 
+data class PatientProfile(
+    val name: String,
+    val age: Int,
+    val bloodGroup: String,
+    val height: String,
+    val weight: String,
+    val gender: String,
+    val allergies: String,
+    val chronicDiseases: String,
+    val insuranceDetails: String,
+    val organDonorStatus: String = "REGISTERED ORGAN DONOR",
+    val avatarInitials: String,
+    val emergencyContactName: String,
+    val emergencyContactPhone: String,
+    val emergencyContactRelation: String,
+    val colorHex: String = "#3F51B5"
+)
+
 class MedViewModel(private val repository: MedRepository) : ViewModel() {
+
+    val familyProfiles = listOf(
+        PatientProfile(
+            name = "Sarah",
+            age = 28,
+            bloodGroup = "O+",
+            height = "168 cm",
+            weight = "59 kg",
+            gender = "Female",
+            allergies = "Penicillin, Sulfa drugs, Peanuts",
+            chronicDiseases = "Mild Asthma, Seasonal Allergies",
+            insuranceDetails = "UnitedHealth HMO - Policy ID: #8821X-S",
+            organDonorStatus = "REGISTERED ORGAN DONOR",
+            avatarInitials = "SK",
+            emergencyContactName = "Margaret K.",
+            emergencyContactPhone = "+1 (555) 019-9111",
+            emergencyContactRelation = "Mother",
+            colorHex = "#2E7D32"
+        ),
+        PatientProfile(
+            name = "Robert",
+            age = 61,
+            bloodGroup = "A-",
+            height = "176 cm",
+            weight = "82 kg",
+            gender = "Male",
+            allergies = "Asprin, Iodine, Penicillin",
+            chronicDiseases = "Hypertension, Type-2 Diabetes",
+            insuranceDetails = "Medicare Plus Gold - Policy ID: #9932B-R",
+            organDonorStatus = "REGISTERED ORGAN DONOR",
+            avatarInitials = "RK",
+            emergencyContactName = "Sarah K.",
+            emergencyContactPhone = "+1 (555) 882-1321",
+            emergencyContactRelation = "Daughter",
+            colorHex = "#1565C0"
+        ),
+        PatientProfile(
+            name = "Margaret",
+            age = 57,
+            bloodGroup = "B+",
+            height = "162 cm",
+            weight = "66 kg",
+            gender = "Female",
+            allergies = "None reported",
+            chronicDiseases = "Hypothyroidism under therapy",
+            insuranceDetails = "UnitedHealth PPO - Policy ID: #8821X-M",
+            organDonorStatus = "REGISTERED ORGAN DONOR",
+            avatarInitials = "MK",
+            emergencyContactName = "Sarah K.",
+            emergencyContactPhone = "+1 (555) 882-1321",
+            emergencyContactRelation = "Daughter",
+            colorHex = "#E64A19"
+        ),
+        PatientProfile(
+            name = "Leo",
+            age = 5,
+            bloodGroup = "O+",
+            height = "110 cm",
+            weight = "19 kg",
+            gender = "Male",
+            allergies = "Full Dairy, Severe Peanuts",
+            chronicDiseases = "None",
+            insuranceDetails = "UnitedHealth KidCare - Policy ID: #8821X-L",
+            organDonorStatus = "NOT APPLICABLE",
+            avatarInitials = "LK",
+            emergencyContactName = "Sarah K.",
+            emergencyContactPhone = "+1 (555) 882-1321",
+            emergencyContactRelation = "Mother",
+            colorHex = "#8E24AA"
+        )
+    )
+
+    private val _activeProfile = MutableStateFlow<PatientProfile>(familyProfiles[0])
+    val activeProfile: StateFlow<PatientProfile> = _activeProfile.asStateFlow()
+
+    fun selectProfile(profile: PatientProfile) {
+        _activeProfile.value = profile
+        viewModelScope.launch {
+            createNotificationLog(
+                title = "👤 Profiles Changed",
+                message = "Switched to family management space of ${profile.name} (${profile.gender}, Age ${profile.age})"
+            )
+        }
+    }
 
     // UI state flows from Room
     val medicalRecords: StateFlow<List<MedicalRecord>> = repository.allRecords
@@ -64,7 +166,7 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
     init {
         // Pre-populate database with beautiful sample data if empty
         viewModelScope.launch {
-            medicalRecords.first().let { records ->
+            repository.allRecords.first().let { records ->
                 if (records.isEmpty()) {
                     prepopulateDatabase()
                 }
@@ -346,7 +448,8 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
                 type = "Prescription",
                 date = recordDate,
                 patientNotes = patientNotes,
-                rawExtractedContent = "Medication: ${result.medicationName}\nDosage: ${result.dosage}\nFrequency: ${result.frequency}\nDuration: ${result.duration}\nSuggested Alarm Times: ${result.specificTimes}"
+                rawExtractedContent = "Medication: ${result.medicationName}\nDosage: ${result.dosage}\nFrequency: ${result.frequency}\nDuration: ${result.duration}\nSuggested Alarm Times: ${result.specificTimes}",
+                profileName = activeProfile.value.name
             )
             repository.insertRecord(record)
 
@@ -359,7 +462,8 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
                 specificTimes = result.specificTimes,
                 nextReminderTime = parseTimeToEpoch(result.specificTimes.split(",").firstOrNull() ?: "08:00"),
                 patientNotes = result.notes,
-                isActive = true
+                isActive = true,
+                profileName = activeProfile.value.name
             )
             repository.insertReminder(reminder)
 
@@ -372,7 +476,8 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
                     time = result.appointmentTime,
                     location = "Main Clinic - Doctor Consult Suite",
                     notes = result.appointmentNotes,
-                    isCompleted = false
+                    isCompleted = false,
+                    profileName = activeProfile.value.name
                 )
                 repository.insertAppointment(appt)
             }
@@ -412,7 +517,8 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
 
     // Direct manual insertion helpers
     fun addMedicalRecord(record: MedicalRecord) = viewModelScope.launch {
-        repository.insertRecord(record)
+        val mappedRecord = record.copy(profileName = activeProfile.value.name)
+        repository.insertRecord(mappedRecord)
     }
 
     fun addMedicalRecordWithAttachment(
@@ -440,13 +546,14 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
                 date = dateStr,
                 patientNotes = notes,
                 attachedFileName = resolvedName,
-                attachmentPath = securePath
+                attachmentPath = securePath,
+                profileName = activeProfile.value.name
             )
             repository.insertRecord(record)
 
             // Auto create notification log
             val logTitle = "📎 Manual Record Logged"
-            val logMsg = "Securely stored $type: '$title' ${if (resolvedName.isNotEmpty()) "with encrypted file attachment '$resolvedName'" else ""}"
+            val logMsg = "Securely stored $type: '$title' ${if (resolvedName.isNotEmpty()) "with encrypted file attachment '$resolvedName'" else ""} for ${activeProfile.value.name}"
             repository.insertLog(
                 NotificationLog(
                     title = logTitle,
@@ -467,7 +574,8 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
     }
 
     fun addDoctorAppointment(appointment: DoctorAppointment) = viewModelScope.launch {
-        repository.insertAppointment(appointment)
+        val mappedAppt = appointment.copy(profileName = activeProfile.value.name)
+        repository.insertAppointment(mappedAppt)
     }
 
     fun deleteDoctorAppointment(appointment: DoctorAppointment) = viewModelScope.launch {
@@ -479,7 +587,8 @@ class MedViewModel(private val repository: MedRepository) : ViewModel() {
     }
 
     fun addMedicationReminder(reminder: MedicationReminder) = viewModelScope.launch {
-        repository.insertReminder(reminder)
+        val mappedReminder = reminder.copy(profileName = activeProfile.value.name)
+        repository.insertReminder(mappedReminder)
     }
 
     fun deleteMedicationReminder(reminder: MedicationReminder) = viewModelScope.launch {
