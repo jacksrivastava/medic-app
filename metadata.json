@@ -1,0 +1,8 @@
+{
+  "name": "MedKeeper",
+  "description": "Patient companion app to store medical records, track doctor appointments, and receive automated medication reminders via push notifications by scanning prescriptions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
